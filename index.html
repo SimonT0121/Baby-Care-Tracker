@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="嬰幼兒照顧追蹤應用 - 幫助父母記錄孩子的成長和日常護理">
+    <meta name="theme-color" content="#4285f4">
+    <title>Baby Care Tracker</title>
+    <link rel="stylesheet" href="./css/styles.css">
+    <link rel="./manifest" href="manifest.json">
+    <link rel="icon" href="./images/favicon.ico">
+    <link rel="apple-touch-icon" href="images/icon-192x192.png">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Baby Care Tracker</h1>
+            <nav id="main-nav">
+                <button id="menu-toggle" aria-label="菜單">☰</button>
+                <ul class="nav-menu">
+                    <li><a href="#" data-page="dashboard" class="active">主頁</a></li>
+                    <li><a href="#" data-page="children">孩子管理</a></li>
+                    <li><a href="#" data-page="activities">日常活動</a></li>
+                    <li><a href="#" data-page="health">健康記錄</a></li>
+                    <li><a href="#" data-page="milestones">發展里程碑</a></li>
+                    <li><a href="#" data-page="stats">統計分析</a></li>
+                    <li><a href="#" data-page="settings">設置</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main id="app-container">
+        <!-- 當前選中的孩子選擇器 (除了孩子管理頁面外的所有頁面都會顯示) -->
+        <div id="child-selector" class="container hidden">
+            <select id="current-child">
+                <option value="">請選擇孩子</option>
+                <!-- 這裡將由JavaScript動態填充 -->
+            </select>
+        </div>
+
+        <!-- 內容頁面容器 - 由JavaScript動態填充 -->
+        <div id="page-container" class="container">
+            <!-- Dashboard Page (默認頁面) -->
+            <section id="dashboard-page" class="page active">
+                <h2>概覽</h2>
+                <div id="quick-actions" class="card-container">
+                    <div class="card action-card" data-action="feed">
+                        <h3>記錄餵食</h3>
+                        <p>快速添加餵食記錄</p>
+                    </div>
+                    <div class="card action-card" data-action="sleep">
+                        <h3>記錄睡眠</h3>
+                        <p>追蹤寶寶的睡眠</p>
+                    </div>
+                    <div class="card action-card" data-action="diaper">
+                        <h3>記錄尿布</h3>
+                        <p>記錄尿布更換</p>
+                    </div>
+                    <div class="card action-card" data-action="health">
+                        <h3>健康記錄</h3>
+                        <p>記錄體重、身高等</p>
+                    </div>
+                </div>
+                <div id="daily-summary" class="card">
+                    <h3>今日摘要</h3>
+                    <div id="today-summary-content">
+                        <p>請先選擇一個孩子</p>
+                    </div>
+                </div>
+                <div id="recent-activities" class="card">
+                    <h3>最近活動</h3>
+                    <div id="recent-activities-list">
+                        <!-- 動態填充的活動列表 -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Children Page -->
+            <section id="children-page" class="page">
+                <h2>孩子管理</h2>
+                <button id="add-child-btn" class="primary-btn">添加孩子</button>
+                <div id="children-list" class="card-container">
+                    <!-- 動態填充的孩子卡片 -->
+                </div>
+            </section>
+
+            <!-- Activities Page -->
+            <section id="activities-page" class="page">
+                <h2>日常活動</h2>
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="feed">餵食</button>
+                    <button class="tab-btn" data-tab="sleep">睡眠</button>
+                    <button class="tab-btn" data-tab="diaper">尿布</button>
+                </div>
+                <div class="date-selector">
+                    <button id="prev-date">&lt;</button>
+                    <input type="date" id="activities-date">
+                    <button id="next-date">&gt;</button>
+                </div>
+                <div class="tab-content">
+                    <div id="feed-tab" class="tab-pane active">
+                        <button id="add-feed-btn" class="action-btn">記錄餵食</button>
+                        <div id="feed-list" class="list-container">
+                            <!-- 動態填充的餵食記錄 -->
+                        </div>
+                    </div>
+                    <div id="sleep-tab" class="tab-pane">
+                        <button id="add-sleep-btn" class="action-btn">記錄睡眠</button>
+                        <div id="sleep-list" class="list-container">
+                            <!-- 動態填充的睡眠記錄 -->
+                        </div>
+                    </div>
+                    <div id="diaper-tab" class="tab-pane">
+                        <button id="add-diaper-btn" class="action-btn">記錄尿布</button>
+                        <div id="diaper-list" class="list-container">
+                            <!-- 動態填充的尿布記錄 -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Health Page -->
+            <section id="health-page" class="page">
+                <h2>健康記錄</h2>
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="growth">生長記錄</button>
+                    <button class="tab-btn" data-tab="checkups">健康訪視</button>
+                    <button class="tab-btn" data-tab="vaccines">疫苗記錄</button>
+                    <button class="tab-btn" data-tab="medication">用藥記錄</button>
+                </div>
+                <div class="tab-content">
+                    <div id="growth-tab" class="tab-pane active">
+                        <button id="add-growth-btn" class="action-btn">添加生長記錄</button>
+                        <div id="growth-list" class="list-container">
+                            <!-- 動態填充的生長記錄 -->
+                        </div>
+                    </div>
+                    <div id="checkups-tab" class="tab-pane">
+                        <button id="add-checkup-btn" class="action-btn">添加健康訪視</button>
+                        <div id="checkups-list" class="list-container">
+                            <!-- 動態填充的健康訪視記錄 -->
+                        </div>
+                    </div>
+                    <div id="vaccines-tab" class="tab-pane">
+                        <button id="add-vaccine-btn" class="action-btn">添加疫苗記錄</button>
+                        <div id="vaccines-list" class="list-container">
+                            <!-- 動態填充的疫苗記錄 -->
+                        </div>
+                    </div>
+                    <div id="medication-tab" class="tab-pane">
+                        <button id="add-medication-btn" class="action-btn">添加用藥記錄</button>
+                        <div id="medication-list" class="list-container">
+                            <!-- 動態填充的用藥記錄 -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Milestones Page -->
+            <section id="milestones-page" class="page">
+                <h2>發展里程碑</h2>
+                <div class="milestone-categories">
+                    <button class="milestone-category active" data-category="all">全部</button>
+                    <button class="milestone-category" data-category="motor">動作技能</button>
+                    <button class="milestone-category" data-category="language">語言能力</button>
+                    <button class="milestone-category" data-category="social">社交情感</button>
+                    <button class="milestone-category" data-category="cognitive">認知能力</button>
+                </div>
+                <div id="milestones-list" class="card-container">
+                    <!-- 動態填充的里程碑卡片 -->
+                </div>
+            </section>
+
+            <!-- Stats Page -->
+            <section id="stats-page" class="page">
+                <h2>統計分析</h2>
+                <div class="stats-period-selector">
+                    <button class="period-btn active" data-period="week">週</button>
+                    <button class="period-btn" data-period="month">月</button>
+                    <button class="period-btn" data-period="custom">自定義</button>
+                </div>
+                <div id="custom-period" class="hidden">
+                    <label for="stats-start-date">開始日期:</label>
+                    <input type="date" id="stats-start-date">
+                    <label for="stats-end-date">結束日期:</label>
+                    <input type="date" id="stats-end-date">
+                    <button id="apply-custom-period" class="secondary-btn">應用</button>
+                </div>
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="feeding-stats">餵食</button>
+                    <button class="tab-btn" data-tab="sleep-stats">睡眠</button>
+                    <button class="tab-btn" data-tab="diaper-stats">尿布</button>
+                    <button class="tab-btn" data-tab="growth-stats">生長</button>
+                </div>
+                <div class="tab-content">
+                    <div id="feeding-stats-tab" class="tab-pane active">
+                        <div class="chart-container">
+                            <canvas id="feeding-chart"></canvas>
+                        </div>
+                        <div id="feeding-summary" class="stats-summary">
+                            <!-- 動態填充的餵食統計摘要 -->
+                        </div>
+                    </div>
+                    <div id="sleep-stats-tab" class="tab-pane">
+                        <div class="chart-container">
+                            <canvas id="sleep-chart"></canvas>
+                        </div>
+                        <div id="sleep-summary" class="stats-summary">
+                            <!-- 動態填充的睡眠統計摘要 -->
+                        </div>
+                    </div>
+                    <div id="diaper-stats-tab" class="tab-pane">
+                        <div class="chart-container">
+                            <canvas id="diaper-chart"></canvas>
+                        </div>
+                        <div id="diaper-summary" class="stats-summary">
+                            <!-- 動態填充的尿布統計摘要 -->
+                        </div>
+                    </div>
+                    <div id="growth-stats-tab" class="tab-pane">
+                        <div class="chart-container">
+                            <canvas id="growth-chart"></canvas>
+                        </div>
+                        <div id="growth-summary" class="stats-summary">
+                            <!-- 動態填充的生長統計摘要 -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Settings Page -->
+            <section id="settings-page" class="page">
+                <h2>設置</h2>
+                <div class="settings-group">
+                    <h3>應用設置</h3>
+                    <div class="setting-item">
+                        <label for="theme-selector">主題:</label>
+                        <select id="theme-selector">
+                            <option value="light">淺色</option>
+                            <option value="dark">深色</option>
+                            <option value="system">跟隨系統</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label for="language-selector">語言:</label>
+                        <select id="language-selector">
+                            <option value="zh-TW">繁體中文</option>
+                            <option value="en">English</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label for="data-retention">數據保留期限:</label>
+                        <select id="data-retention">
+                            <option value="1">1 年</option>
+                            <option value="2">2 年</option>
+                            <option value="3">3 年</option>
+                            <option value="0">永久保留</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="settings-group">
+                    <h3>數據管理</h3>
+                    <button id="backup-data-btn" class="secondary-btn">備份數據</button>
+                    <button id="restore-data-btn" class="secondary-btn">還原數據</button>
+                    <button id="clear-data-btn" class="danger-btn">清除所有數據</button>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- 模態對話框 (各種表單) -->
+    <div id="modal-overlay" class="modal-overlay hidden">
+        <div id="modal-container" class="modal-container">
+            <div class="modal-header">
+                <h3 id="modal-title">標題</h3>
+                <button id="close-modal" class="close-btn">&times;</button>
+            </div>
+            <div id="modal-content" class="modal-content">
+                <!-- 模態內容將由JavaScript動態填充 -->
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Baby Care Tracker</p>
+            <p id="version">版本 1.0.0</p>
+        </div>
+    </footer>
+
+    <!-- 離線提示 -->
+    <div id="offline-notification" class="notification hidden">
+        您現在處於離線狀態。部分功能可能不可用。
+    </div>
+
+    <!-- 通用提示訊息 -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- 載入JavaScript文件 -->
+    <script src="./js/utils.js"></script>
+    <script src="./js/db.js"></script>
+    <script src="./js/services/childService.js"></script>
+    <script src="./js/services/activityService.js"></script>
+    <script src="./js/services/healthService.js"></script>
+    <script src="./js/services/milestoneService.js"></script>
+    <script src="./js/views/childView.js"></script>
+    <script src="./js/views/activityView.js"></script>
+    <script src="./js/views/healthView.js"></script>
+    <script src="./js/views/milestoneView.js"></script>
+    <script src="./js/views/statsView.js"></script>
+    <script src="./js/views/settingsView.js"></script>
+    <script src="./js/app.js"></script>
+
+    <!-- 註冊Service Worker -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => {
+                        console.log('Service Worker 註冊成功:', registration.scope);
+                    })
+                    .catch(error => {
+                        console.log('Service Worker 註冊失敗:', error);
+                    });
+            });
+        }
+    </script>
+</body>
+</html>
