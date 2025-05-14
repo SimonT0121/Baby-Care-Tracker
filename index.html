@@ -297,7 +297,7 @@
     <!-- 通用提示訊息 -->
     <div id="toast-container" class="toast-container"></div>
 
-    <!-- 載入JavaScript文件 -->
+<!-- 載入JavaScript文件 -->
     <script src="./js/utils.js"></script>
     <script src="./js/db.js"></script>
     <script src="./js/services/childService.js"></script>
@@ -326,6 +326,178 @@
                     });
             });
         }
+    </script>
+
+        <script>
+        // 直接在頁面上定義里程碑初始化功能
+        (function() {
+            // 確保只在需要的服務存在時運行
+            if (!window.MilestoneService || !window.Database || !window.ChildService) {
+                console.error('必要的服務未加載!');
+                return;
+            }
+
+            // 添加里程碑初始化方法 (確保方法存在)
+            MilestoneService.initializeStandardMilestones = async function(childId) {
+                try {
+                    console.log(`開始初始化標準里程碑: childId=${childId}`);
+                    if (window.AppLog) window.AppLog.addLog(`開始初始化標準里程碑: childId=${childId}`);
+
+                    // 檢查孩子是否存在
+                    const child = await ChildService.getChildById(childId);
+                    if (!child) {
+                        const error = new Error(`找不到ID為 ${childId} 的孩子`);
+                        if (window.AppLog) window.AppLog.addLog(`初始化里程碑錯誤: ${error.message}`);
+                        throw error;
+                    }
+
+                    // 檢查是否已有里程碑記錄
+                    const existingMilestones = await Database.getByIndex('milestones', 'childId', childId);
+                    if (existingMilestones.length > 0) {
+                        console.log(`孩子已有 ${existingMilestones.length} 個里程碑記錄，跳過初始化`);
+                        if (window.AppLog) window.AppLog.addLog(`孩子已有 ${existingMilestones.length} 個里程碑記錄，跳過初始化`);
+                        return true; // 已有記錄，不需要初始化
+                    }
+
+                    // 獲取標準里程碑列表
+                    const standardMilestones = MilestoneService.getStandardMilestones(); // 假設此方法已在 MilestoneService 中定義
+                    if (!standardMilestones || standardMilestones.length === 0) {
+                        console.warn('未獲取到標準里程碑列表或列表為空，無法初始化。');
+                        if (window.AppLog) window.AppLog.addLog('未獲取到標準里程碑列表或列表為空，無法初始化。');
+                        return false;
+                    }
+                    console.log(`準備初始化 ${standardMilestones.length} 個標準里程碑`);
+                    if (window.AppLog) window.AppLog.addLog(`準備初始化 ${standardMilestones.length} 個標準里程碑`);
+
+                    // 為每個標準里程碑創建記錄
+                    let createdCount = 0;
+                    for (const milestone of standardMilestones) {
+                        try {
+                            // 創建未達成的空記錄
+                            const milestoneData = {
+                                childId: childId,
+                                name: milestone.name,
+                                category: milestone.category,
+                                ageMonthRecommended: milestone.ageMonthRecommended,
+                                achievedDate: null, // 未達成
+                                note: '',
+                                createdAt: new Date(),
+                                updatedAt: new Date()
+                            };
+
+                            await Database.add('milestones', milestoneData);
+                            createdCount++;
+                        } catch (addError) {
+                            console.error(`添加里程碑 ${milestone.name} 失敗:`, addError);
+                            // 繼續處理其他里程碑
+                        }
+                    }
+
+                    console.log(`標準里程碑初始化完成: 創建了 ${createdCount} 個記錄`);
+                    if (window.AppLog) window.AppLog.addLog(`標準里程碑初始化完成: 創建了 ${createdCount} 個記錄`);
+                    return true;
+                } catch (error) {
+                    console.error(`為孩子 ${childId} 初始化標準里程碑失敗:`, error);
+                    if (window.AppLog) window.AppLog.addLog(`初始化標準里程碑失敗: ${error.message}`);
+                    throw error;
+                }
+            };
+
+            // 添加初始化按鈕到 "發展里程碑" 頁面
+            function addInitButtonToMilestonesPage() {
+                // 確保不重複添加
+                if (document.getElementById('initMilestonesBtn')) return;
+
+                const milestonesPageSection = document.getElementById('milestones-page');
+                if (!milestonesPageSection) {
+                    console.warn('找不到 "發展里程碑" 頁面 (id="milestones-page")，無法添加初始化按鈕。');
+                    return;
+                }
+
+                const btn = document.createElement('button');
+                btn.id = 'initMilestonesBtn';
+                btn.innerText = '初始化里程碑數據';
+                // 更新按鈕樣式，使其適合在 section 內部顯示
+                btn.style.padding = '10px 15px';
+                btn.style.backgroundColor = '#28a745'; // 綠色，表示積極操作
+                btn.style.color = 'white';
+                btn.style.border = 'none';
+                btn.style.borderRadius = '4px';
+                btn.style.margin = '15px 0'; // 在列表上方或下方留出一些空間
+                btn.style.cursor = 'pointer';
+                // btn.style.display = 'block'; // 如果希望按鈕獨占一行
+                // btn.style.marginLeft = 'auto'; // 如果希望按鈕靠右 (需要父容器配合或 display:block)
+                // btn.style.marginRight = 'auto';
+
+                btn.onclick = async function() {
+                    try {
+                        btn.disabled = true;
+                        btn.innerText = '初始化中...';
+                        btn.style.backgroundColor = '#6c757d'; // 禁用時的顏色
+
+                        const currentChild = await ChildService.getCurrentChild();
+                        if (currentChild) {
+                            if (window.AppLog) window.AppLog.addLog(`開始為孩子 ${currentChild.name} 初始化里程碑`);
+                            const success = await MilestoneService.initializeStandardMilestones(currentChild.id);
+
+                            if (success) {
+                                const milestones = await Database.getByIndex('milestones', 'childId', currentChild.id);
+                                if (window.AppLog) window.AppLog.addLog(`初始化后里程碑數量: ${milestones.length}`);
+                                alert(`里程碑初始化成功！已創建/確認 ${milestones.length} 個里程碑記錄。請刷新里程碑列表查看。`);
+
+                                // 考慮是否自動刷新里程碑視圖而不是整個頁面
+                                // 例如，如果 MilestoneView 有一個渲染方法：
+                                // if (window.MilestoneView && typeof window.MilestoneView.renderMilestonesForCurrentChild === 'function') {
+                                //     await window.MilestoneView.renderMilestonesForCurrentChild();
+                                // } else {
+                                //     location.reload(); // 作為後備
+                                // }
+                                // 暫時先用提示用戶刷新，或直接刷新頁面
+                                if (confirm("里程碑已初始化，是否刷新頁面查看最新數據？")) {
+                                    location.reload();
+                                }
+
+                            } else {
+                                alert('里程碑可能已經初始化過，或未找到標準里程碑數據。');
+                            }
+                        } else {
+                            alert('未找到當前孩子，請先選擇一個孩子。');
+                        }
+                    } catch (error) {
+                        alert('初始化失敗: ' + error.message);
+                        console.error('初始化失敗:', error);
+                    } finally {
+                        btn.disabled = false;
+                        btn.innerText = '初始化里程碑數據';
+                        btn.style.backgroundColor = '#28a745'; // 恢復原色
+                    }
+                };
+
+                // 將按鈕添加到 "發展里程碑" 頁面的末尾，或者其他你認為合適的位置
+                // 例如，添加到 milestones-list 的前面或後面
+                const milestonesListContainer = milestonesPageSection.querySelector('#milestones-list');
+                if (milestonesListContainer) {
+                    // 在里程碑列表前添加按鈕
+                    milestonesListContainer.parentNode.insertBefore(btn, milestonesListContainer);
+                } else {
+                    // 如果列表容器不存在，直接添加到 section 末尾
+                    milestonesPageSection.appendChild(btn);
+                }
+                console.log('初始化里程碑數據按鈕已添加到發展里程碑頁面。');
+                 if (window.AppLog) window.AppLog.addLog('初始化里程碑數據按鈕已添加到發展里程碑頁面。');
+            }
+
+            // 等待DOM完全加載後添加按鈕
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', addInitButtonToMilestonesPage);
+            } else {
+                // DOMContentLoaded 已經觸發
+                addInitButtonToMilestonesPage();
+            }
+
+            console.log('里程碑初始化功能已準備');
+            if (window.AppLog) window.AppLog.addLog('里程碑初始化功能已準備');
+        })();
     </script>
 </body>
 </html>
