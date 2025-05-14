@@ -443,6 +443,17 @@ class StatsView {
         
         if (!chartContainer) return;
         
+        // 添加安全檢查 - 檢查Chart對象是否存在
+        if (typeof Chart === 'undefined') {
+            console.error('Chart.js 未載入');
+            chartContainer.innerHTML = `
+                <div class="chart-error">
+                    <p>圖表庫未載入</p>
+                    <p class="error-details">請確保應用已正確安裝或重新載入頁面</p>
+                </div>`;
+            return;
+        }
+        
         // 準備圖表數據
         const dailyData = stats.daily;
         const labels = dailyData.map(d => d.date);
@@ -605,6 +616,17 @@ class StatsView {
         const chartContainer = document.getElementById('sleep-chart');
         
         if (!chartContainer) return;
+        
+        // 添加安全檢查 - 檢查Chart對象是否存在
+        if (typeof Chart === 'undefined') {
+            console.error('Chart.js 未載入');
+            chartContainer.innerHTML = `
+                <div class="chart-error">
+                    <p>圖表庫未載入</p>
+                    <p class="error-details">請確保應用已正確安裝或重新載入頁面</p>
+                </div>`;
+            return;
+        }
         
         // 準備圖表數據
         const dailyData = stats.daily;
@@ -778,6 +800,17 @@ class StatsView {
         const chartContainer = document.getElementById('diaper-chart');
         
         if (!chartContainer) return;
+        
+        // 添加安全檢查 - 檢查Chart對象是否存在
+        if (typeof Chart === 'undefined') {
+            console.error('Chart.js 未載入');
+            chartContainer.innerHTML = `
+                <div class="chart-error">
+                    <p>圖表庫未載入</p>
+                    <p class="error-details">請確保應用已正確安裝或重新載入頁面</p>
+                </div>`;
+            return;
+        }
         
         // 準備圖表數據
         const dailyData = stats.daily;
@@ -1091,6 +1124,17 @@ class StatsView {
         const chartContainer = document.getElementById('growth-chart');
         
         if (!chartContainer) return;
+        
+        // 添加安全檢查 - 檢查Chart對象是否存在
+        if (typeof Chart === 'undefined') {
+            console.error('Chart.js 未載入');
+            chartContainer.innerHTML = `
+                <div class="chart-error">
+                    <p>圖表庫未載入</p>
+                    <p class="error-details">請確保應用已正確安裝或重新載入頁面</p>
+                </div>`;
+            return;
+        }
         
         // 如果沒有數據
         if (growthData.dates.length === 0) {
