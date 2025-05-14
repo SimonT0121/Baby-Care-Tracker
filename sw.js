@@ -20,6 +20,7 @@ const STATIC_CACHE_URLS = [
   './js/views/milestoneView.js',
   './js/views/statsView.js',
   './js/views/settingsView.js',
+  './js/libs/chart.min.js', 
   './images/icon-192x192.png',
   './images/icon-512x512.png',
   './manifest.json'
