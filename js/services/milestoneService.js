@@ -1,5 +1,3 @@
-
-
 /**
  * 里程碑服務 - 處理發展里程碑相關的數據操作
  */
@@ -28,23 +26,50 @@ class MilestoneService {
      */
     static async getAllMilestones(childId) {
         try {
+            if (window.AppLog) window.AppLog.addLog(`開始獲取里程碑: childId=${childId}`);
+            
+            // 檢查參數
+            if (!childId) {
+                const error = new Error('孩子ID不能為空');
+                if (window.AppLog) window.AppLog.addLog(`參數錯誤: ${error.message}`);
+                throw error;
+            }
+            
             // 檢查孩子是否存在
+            if (window.AppLog) window.AppLog.addLog(`檢查孩子是否存在: ${childId}`);
             const child = await ChildService.getChildById(childId);
             
             if (!child) {
-                throw new Error(`找不到ID為 ${childId} 的孩子`);
+                const error = new Error(`找不到ID為 ${childId} 的孩子`);
+                if (window.AppLog) window.AppLog.addLog(`錯誤: ${error.message}`);
+                throw error;
+            }
+            if (window.AppLog) window.AppLog.addLog(`孩子存在: ${child.name}`);
+            
+            // 獲取所有儲存的里程碑 - 注意這可能返回空數組
+            if (window.AppLog) window.AppLog.addLog(`獲取已儲存里程碑`);
+            
+            let savedMilestones = [];
+            try {
+                savedMilestones = await Database.getByIndex(this.STORE_NAME, 'childId', childId);
+                if (window.AppLog) window.AppLog.addLog(`獲取到 ${savedMilestones.length} 個已儲存里程碑`);
+            } catch (dbError) {
+                // 處理數據庫錯誤，但允許繼續執行
+                if (window.AppLog) window.AppLog.addLog(`數據庫查詢錯誤: ${dbError.message}, 將使用空數組繼續`);
+                console.error('數據庫查詢錯誤:', dbError);
+                savedMilestones = []; // 確保使用空數組繼續
             }
             
-            // 獲取所有儲存的里程碑
-            const savedMilestones = await Database.getByIndex(this.STORE_NAME, 'childId', childId);
-            
             // 獲取標準里程碑列表
+            if (window.AppLog) window.AppLog.addLog(`獲取標準里程碑列表`);
             const standardMilestones = this.getStandardMilestones();
+            if (window.AppLog) window.AppLog.addLog(`獲取到 ${standardMilestones.length} 個標準里程碑`);
             
             // 合併已保存的里程碑和標準里程碑
+            if (window.AppLog) window.AppLog.addLog(`合併里程碑數據`);
             const mergedMilestones = standardMilestones.map(stdMilestone => {
                 // 檢查是否有對應的已保存里程碑
-                const savedMilestone = savedMilestones.find(saved => saved.name === stdMilestone.name);
+                const savedMilestone = savedMilestones.find(saved => saved && saved.name === stdMilestone.name);
                 
                 if (savedMilestone) {
                     // 返回保存的記錄，但包含標準里程碑的基本信息
@@ -68,15 +93,106 @@ class MilestoneService {
             
             // 添加自定義里程碑（不在標準列表中的）
             const customMilestones = savedMilestones.filter(saved => 
-                !standardMilestones.some(std => std.name === saved.name)
+                saved && !standardMilestones.some(std => std.name === saved.name)
             ).map(custom => ({
                 ...custom,
                 isStandard: false
             }));
             
-            return [...mergedMilestones, ...customMilestones];
+            const result = [...mergedMilestones, ...customMilestones];
+            if (window.AppLog) window.AppLog.addLog(`里程碑數據獲取完成: 共 ${result.length} 個里程碑`);
+            
+            return result;
         } catch (error) {
+            if (window.AppLog) window.AppLog.addLog(`里程碑載入失敗: ${error.message}`);
             console.error(`獲取孩子 ${childId} 的所有里程碑失敗:`, error);
+            
+            // 顯示錯誤到頁面
+            const errorDiv = document.getElementById('errorMessages');
+            if (errorDiv) {
+                errorDiv.style.display = 'block';
+                errorDiv.innerText = `載入里程碑資料失敗: ${error.message}`;
+                // 30秒後自動隱藏錯誤
+                setTimeout(() => {
+                    errorDiv.style.display = 'none';
+                }, 30000);
+            }
+            
+            throw error;
+        }
+    }
+    
+    /**
+     * 為孩子初始化標準里程碑
+     * 這個方法可以在添加新孩子時調用，確保里程碑表不為空
+     * @param {string} childId 孩子ID
+     * @returns {Promise<boolean>} 操作是否成功
+     */
+    static async initializeStandardMilestones(childId) {
+        try {
+            if (window.AppLog) window.AppLog.addLog(`開始初始化標準里程碑: childId=${childId}`);
+            
+            // 檢查孩子是否存在
+            const child = await ChildService.getChildById(childId);
+            if (!child) {
+                const error = new Error(`找不到ID為 ${childId} 的孩子`);
+                if (window.AppLog) window.AppLog.addLog(`初始化里程碑錯誤: ${error.message}`);
+                throw error;
+            }
+            
+            // 檢查是否已有里程碑記錄
+            const existingMilestones = await Database.getByIndex(this.STORE_NAME, 'childId', childId);
+            if (existingMilestones.length > 0) {
+                if (window.AppLog) window.AppLog.addLog(`孩子已有 ${existingMilestones.length} 個里程碑記錄，跳過初始化`);
+                return true; // 已有記錄，不需要初始化
+            }
+            
+            // 獲取標準里程碑列表
+            const standardMilestones = this.getStandardMilestones();
+            if (window.AppLog) window.AppLog.addLog(`準備初始化 ${standardMilestones.length} 個標準里程碑`);
+            
+            // 計算當前月齡
+            const age = Utils.calculateAge(child.birthDate);
+            const ageInMonths = age.years * 12 + age.months;
+            if (window.AppLog) window.AppLog.addLog(`孩子當前月齡: ${ageInMonths}個月`);
+            
+            // 為已達到月齡的里程碑創建記錄 (可選，取決於應用需求)
+            let createdCount = 0;
+            for (const milestone of standardMilestones) {
+                try {
+                    // 選項1: 只創建未達成的空記錄 (推薦)
+                    const milestoneData = {
+                        childId: childId,
+                        name: milestone.name,
+                        category: milestone.category,
+                        ageMonthRecommended: milestone.ageMonthRecommended,
+                        achievedDate: null, // 未達成
+                        note: '',
+                        createdAt: new Date(),
+                        updatedAt: new Date()
+                    };
+                    
+                    // 選項2: 為已過月齡的自動標記為已達成 (可選)
+                    /*
+                    if (milestone.ageMonthRecommended < ageInMonths - 1) {
+                        // 如果里程碑月齡小於當前月齡，標記為已達成
+                        milestoneData.achievedDate = new Date(); 
+                    }
+                    */
+                    
+                    await Database.add(this.STORE_NAME, milestoneData);
+                    createdCount++;
+                } catch (addError) {
+                    console.error(`添加里程碑 ${milestone.name} 失敗:`, addError);
+                    // 繼續處理其他里程碑
+                }
+            }
+            
+            if (window.AppLog) window.AppLog.addLog(`標準里程碑初始化完成: 創建了 ${createdCount} 個記錄`);
+            return true;
+        } catch (error) {
+            if (window.AppLog) window.AppLog.addLog(`初始化標準里程碑失敗: ${error.message}`);
+            console.error(`為孩子 ${childId} 初始化標準里程碑失敗:`, error);
             throw error;
         }
     }
@@ -89,9 +205,13 @@ class MilestoneService {
      */
     static async getMilestonesByCategory(childId, category) {
         try {
+            if (window.AppLog) window.AppLog.addLog(`獲取類別里程碑: childId=${childId}, category=${category}`);
             const allMilestones = await this.getAllMilestones(childId);
-            return allMilestones.filter(milestone => milestone.category === category);
+            const result = allMilestones.filter(milestone => milestone.category === category);
+            if (window.AppLog) window.AppLog.addLog(`獲取類別里程碑完成: ${result.length} 個結果`);
+            return result;
         } catch (error) {
+            if (window.AppLog) window.AppLog.addLog(`獲取類別里程碑失敗: ${error.message}`);
             console.error(`獲取孩子 ${childId} 的 ${category} 類別里程碑失敗:`, error);
             throw error;
         }
@@ -104,9 +224,13 @@ class MilestoneService {
      */
     static async getAchievedMilestones(childId) {
         try {
+            if (window.AppLog) window.AppLog.addLog(`獲取已達成里程碑: childId=${childId}`);
             const allMilestones = await this.getAllMilestones(childId);
-            return allMilestones.filter(milestone => milestone.achievedDate !== null);
+            const result = allMilestones.filter(milestone => milestone.achievedDate !== null);
+            if (window.AppLog) window.AppLog.addLog(`獲取已達成里程碑完成: ${result.length} 個結果`);
+            return result;
         } catch (error) {
+            if (window.AppLog) window.AppLog.addLog(`獲取已達成里程碑失敗: ${error.message}`);
             console.error(`獲取孩子 ${childId} 的已達成里程碑失敗:`, error);
             throw error;
         }
@@ -120,6 +244,8 @@ class MilestoneService {
      */
     static async getUpcomingMilestones(childId, monthsRange = 3) {
         try {
+            if (window.AppLog) window.AppLog.addLog(`獲取即將達成里程碑: childId=${childId}, range=${monthsRange}`);
+            
             // 獲取孩子信息
             const child = await ChildService.getChildById(childId);
             
@@ -130,17 +256,22 @@ class MilestoneService {
             // 計算當前月齡
             const age = Utils.calculateAge(child.birthDate);
             const ageInMonths = age.years * 12 + age.months;
+            if (window.AppLog) window.AppLog.addLog(`孩子當前月齡: ${ageInMonths}個月`);
             
             // 獲取所有里程碑
             const allMilestones = await this.getAllMilestones(childId);
             
             // 過濾未達成且在範圍內的里程碑
-            return allMilestones.filter(milestone => 
+            const result = allMilestones.filter(milestone => 
                 milestone.achievedDate === null && 
                 milestone.ageMonthRecommended > ageInMonths &&
                 milestone.ageMonthRecommended <= (ageInMonths + monthsRange)
             );
+            
+            if (window.AppLog) window.AppLog.addLog(`獲取即將達成里程碑完成: ${result.length} 個結果`);
+            return result;
         } catch (error) {
+            if (window.AppLog) window.AppLog.addLog(`獲取即將達成里程碑失敗: ${error.message}`);
             console.error(`獲取孩子 ${childId} 的即將達成里程碑失敗:`, error);
             throw error;
         }
@@ -154,6 +285,8 @@ class MilestoneService {
      */
     static async getDelayedMilestones(childId, delayMonths = 3) {
         try {
+            if (window.AppLog) window.AppLog.addLog(`獲取延遲發展里程碑: childId=${childId}, delay=${delayMonths}`);
+            
             // 獲取孩子信息
             const child = await ChildService.getChildById(childId);
             
@@ -169,11 +302,15 @@ class MilestoneService {
             const allMilestones = await this.getAllMilestones(childId);
             
             // 過濾未達成且已延遲的里程碑
-            return allMilestones.filter(milestone => 
+            const result = allMilestones.filter(milestone => 
                 milestone.achievedDate === null && 
                 milestone.ageMonthRecommended < (ageInMonths - delayMonths)
             );
+            
+            if (window.AppLog) window.AppLog.addLog(`獲取延遲發展里程碑完成: ${result.length} 個結果`);
+            return result;
         } catch (error) {
+            if (window.AppLog) window.AppLog.addLog(`獲取延遲發展里程碑失敗: ${error.message}`);
             console.error(`獲取孩子 ${childId} 的延遲發展里程碑失敗:`, error);
             throw error;
         }
@@ -189,6 +326,8 @@ class MilestoneService {
      */
     static async markMilestoneAchieved(childId, milestoneName, achievedDate = new Date(), note = '') {
         try {
+            if (window.AppLog) window.AppLog.addLog(`標記里程碑為已達成: ${milestoneName}`);
+            
             // 檢查孩子是否存在
             const child = await ChildService.getChildById(childId);
             
@@ -200,7 +339,7 @@ class MilestoneService {
             const savedMilestones = await Database.getByIndex(this.STORE_NAME, 'childId', childId);
             
             // 檢查是否已有此里程碑記錄
-            const existingMilestone = savedMilestones.find(m => m.name === milestoneName);
+            const existingMilestone = savedMilestones.find(m => m && m.name === milestoneName);
             
             if (existingMilestone) {
                 // 更新已有記錄
@@ -211,6 +350,7 @@ class MilestoneService {
                 };
                 
                 await Database.update(this.STORE_NAME, { ...updateData, id: existingMilestone.id });
+                if (window.AppLog) window.AppLog.addLog(`更新里程碑成功: ${milestoneName}`);
                 return existingMilestone.id;
             } else {
                 // 查找標準里程碑數據
@@ -233,9 +373,11 @@ class MilestoneService {
                 };
                 
                 const milestoneId = await Database.add(this.STORE_NAME, newMilestone);
+                if (window.AppLog) window.AppLog.addLog(`添加里程碑成功: ${milestoneName}`);
                 return milestoneId;
             }
         } catch (error) {
+            if (window.AppLog) window.AppLog.addLog(`標記里程碑為已達成失敗: ${error.message}`);
             console.error(`標記里程碑 ${milestoneName} 為已達成失敗:`, error);
             throw error;
         }
@@ -249,11 +391,13 @@ class MilestoneService {
      */
     static async markMilestoneNotAchieved(childId, milestoneName) {
         try {
+            if (window.AppLog) window.AppLog.addLog(`標記里程碑為未達成: ${milestoneName}`);
+            
             // 獲取所有已保存的里程碑
             const savedMilestones = await Database.getByIndex(this.STORE_NAME, 'childId', childId);
             
             // 檢查是否已有此里程碑記錄
-            const existingMilestone = savedMilestones.find(m => m.name === milestoneName);
+            const existingMilestone = savedMilestones.find(m => m && m.name === milestoneName);
             
             if (existingMilestone) {
                 // 如果是自定義里程碑，則刪除記錄
@@ -261,6 +405,7 @@ class MilestoneService {
                 
                 if (!standardMilestone) {
                     await Database.delete(this.STORE_NAME, existingMilestone.id);
+                    if (window.AppLog) window.AppLog.addLog(`刪除自定義里程碑: ${milestoneName}`);
                 } else {
                     // 更新標準里程碑記錄為未達成
                     const updateData = {
@@ -269,14 +414,17 @@ class MilestoneService {
                     };
                     
                     await Database.update(this.STORE_NAME, { ...updateData, id: existingMilestone.id });
+                    if (window.AppLog) window.AppLog.addLog(`更新里程碑為未達成: ${milestoneName}`);
                 }
                 
                 return true;
             }
             
             // 如果沒有記錄，則已經是未達成狀態
+            if (window.AppLog) window.AppLog.addLog(`里程碑 ${milestoneName} 已經是未達成狀態`);
             return true;
         } catch (error) {
+            if (window.AppLog) window.AppLog.addLog(`標記里程碑為未達成失敗: ${error.message}`);
             console.error(`標記里程碑 ${milestoneName} 為未達成失敗:`, error);
             throw error;
         }
@@ -289,6 +437,8 @@ class MilestoneService {
      */
     static async addCustomMilestone(milestoneData) {
         try {
+            if (window.AppLog) window.AppLog.addLog(`添加自定義里程碑: ${milestoneData.name || '未命名'}`);
+            
             // 確保數據完整性
             if (!milestoneData.childId) {
                 throw new Error('必須指定孩子ID');
@@ -309,7 +459,7 @@ class MilestoneService {
             // 檢查是否已存在同名里程碑
             const savedMilestones = await Database.getByIndex(this.STORE_NAME, 'childId', milestoneData.childId);
             
-            if (savedMilestones.some(m => m.name === milestoneData.name)) {
+            if (savedMilestones.some(m => m && m.name === milestoneData.name)) {
                 throw new Error(`已存在名為 ${milestoneData.name} 的里程碑`);
             }
             
@@ -323,8 +473,10 @@ class MilestoneService {
             };
             
             const milestoneId = await Database.add(this.STORE_NAME, newMilestone);
+            if (window.AppLog) window.AppLog.addLog(`添加自定義里程碑成功: ${milestoneData.name}`);
             return milestoneId;
         } catch (error) {
+            if (window.AppLog) window.AppLog.addLog(`添加自定義里程碑失敗: ${error.message}`);
             console.error('添加自定義里程碑失敗:', error);
             throw error;
         }
@@ -338,6 +490,8 @@ class MilestoneService {
      */
     static async updateMilestone(milestoneId, milestoneData) {
         try {
+            if (window.AppLog) window.AppLog.addLog(`更新里程碑: ID=${milestoneId}`);
+            
             // 檢查里程碑是否存在
             const existingMilestone = await Database.get(this.STORE_NAME, milestoneId);
             
@@ -358,6 +512,7 @@ class MilestoneService {
                 };
                 
                 await Database.update(this.STORE_NAME, updateData);
+                if (window.AppLog) window.AppLog.addLog(`更新標準里程碑成功: ${existingMilestone.name}`);
             } else {
                 // 自定義里程碑可以更新更多字段
                 const updateData = {
@@ -367,10 +522,12 @@ class MilestoneService {
                 };
                 
                 await Database.update(this.STORE_NAME, updateData);
+                if (window.AppLog) window.AppLog.addLog(`更新自定義里程碑成功: ${existingMilestone.name}`);
             }
             
             return milestoneId;
         } catch (error) {
+            if (window.AppLog) window.AppLog.addLog(`更新里程碑失敗: ${error.message}`);
             console.error(`更新里程碑 ${milestoneId} 失敗:`, error);
             throw error;
         }
@@ -383,6 +540,8 @@ class MilestoneService {
      */
     static async deleteCustomMilestone(milestoneId) {
         try {
+            if (window.AppLog) window.AppLog.addLog(`刪除自定義里程碑: ID=${milestoneId}`);
+            
             // 檢查里程碑是否存在
             const existingMilestone = await Database.get(this.STORE_NAME, milestoneId);
             
@@ -399,8 +558,10 @@ class MilestoneService {
             
             // 刪除自定義里程碑
             await Database.delete(this.STORE_NAME, milestoneId);
+            if (window.AppLog) window.AppLog.addLog(`刪除自定義里程碑成功: ${existingMilestone.name}`);
             return true;
         } catch (error) {
+            if (window.AppLog) window.AppLog.addLog(`刪除自定義里程碑失敗: ${error.message}`);
             console.error(`刪除自定義里程碑 ${milestoneId} 失敗:`, error);
             throw error;
         }
@@ -411,6 +572,7 @@ class MilestoneService {
      * @returns {Array} 標準里程碑列表
      */
     static getStandardMilestones() {
+        if (window.AppLog) window.AppLog.addLog(`獲取標準里程碑列表定義`);
         // 標準里程碑列表（基於世界衛生組織和美國疾病控制與預防中心標準）
         // 實際應用需要更完整的數據
         return [
@@ -664,6 +826,65 @@ class MilestoneService {
         ];
     }
 }
+
+// 添加到ChildService的方法，讓新孩子自動初始化里程碑
+// 建議在ChildService.js中添加以下代碼到addChild方法的最後
+/*
+static async addChild(childData) {
+    try {
+        // 現有代碼...
+        
+        const childId = await Database.add(this.STORE_NAME, newChild);
+        
+        // 為新孩子初始化標準里程碑
+        try {
+            await MilestoneService.initializeStandardMilestones(childId);
+        } catch (milestoneError) {
+            console.error('初始化標準里程碑失敗:', milestoneError);
+            // 不影響孩子創建
+        }
+        
+        return childId;
+    } catch (error) {
+        // 錯誤處理...
+    }
+}
+*/
+
+// 初始化應用時的代碼
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        if (window.AppLog) window.AppLog.addLog("應用初始化 - 開始");
+        await Database.initDatabase();
+        if (window.AppLog) window.AppLog.addLog("應用初始化 - 數據庫初始化成功");
+        
+        // 檢查當前孩子並初始化標準里程碑
+        const currentChild = await ChildService.getCurrentChild();
+        if (currentChild) {
+            if (window.AppLog) window.AppLog.addLog(`檢查當前孩子的里程碑`);
+            try {
+                const milestoneCount = await Database.countByIndex('milestones', 'childId', currentChild.id);
+                if (milestoneCount === 0) {
+                    if (window.AppLog) window.AppLog.addLog(`當前孩子沒有里程碑記錄，開始初始化`);
+                    await MilestoneService.initializeStandardMilestones(currentChild.id);
+                    if (window.AppLog) window.AppLog.addLog(`標準里程碑初始化完成`);
+                }
+            } catch (error) {
+                console.error('里程碑初始化檢查失敗:', error);
+            }
+        }
+    } catch (error) {
+        if (window.AppLog) window.AppLog.addLog(`應用初始化失敗: ${error.message}`);
+        console.error('應用初始化失敗:', error);
+        
+        // 顯示錯誤到頁面
+        const errorDiv = document.getElementById('errorMessages');
+        if (errorDiv) {
+            errorDiv.style.display = 'block';
+            errorDiv.innerText = `應用初始化失敗: ${error.message}`;
+        }
+    }
+});
 
 // 導出服務
 window.MilestoneService = MilestoneService;
